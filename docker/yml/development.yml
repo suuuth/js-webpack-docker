@@ -1,0 +1,9 @@
+## development.yml contains all of the development environment container specific template changes for building a local dev env docker-compose.yml
+## This will contain overrides to be added on top of the base.yml template.
+## DO NOT MODIFY: Unless absolutely necessary.
+version: '3.7'
+networks:
+  default: {}
+  traefik:
+    external: true
+    name: traefik

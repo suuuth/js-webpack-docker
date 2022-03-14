@@ -1,0 +1,10 @@
+version: '3.7'
+services:
+  webpack:
+    build: ./../dockerfiles/development/webpack
+    volumes:
+      - ./public/:/public
+      - ./apps/webpack/:/webpack
+    labels:
+      - "traefik.backend=${COMPOSE_PROJECT_NAME}-webpack"
+      - "traefik.expose=false"

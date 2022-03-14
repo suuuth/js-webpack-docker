@@ -1,0 +1,14 @@
+{
+  "minify": true,
+  "options": [
+    "domPrefixes",
+    "hasEvent",
+    "testAllProps",
+    "testProp",
+    "html5shiv",
+    "setClasses",
+    "mq"
+  ],
+  "feature-detects": [
+  ]
+}

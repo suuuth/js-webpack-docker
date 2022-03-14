@@ -1,0 +1,10 @@
+{
+  "aliases": {
+    "main": "./../../public/",
+    "node_modules": "./node_modules",
+    "modernizr$": ".modernizrrc"
+  },
+  "cssEntryPoints": {
+    "main": "./../public/css/source"
+  }
+}

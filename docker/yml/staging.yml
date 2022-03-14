@@ -1,0 +1,257 @@
+networks:
+  default: {}
+  sandbox: {}
+  traefik:
+    external: true
+    name: traefik
+secrets:
+  MMH_EMAIL_PASSWORD:
+    external: true
+    name: MMH_EMAIL_PASSWORD
+  MMH_MARIADB_PASSWORD:
+    external: true
+    name: MMH_MARIADB_PASSWORD
+  MMH_MARIADB_ROOT_PASSWORD:
+    external: true
+    name: MMH_MARIADB_ROOT_PASSWORD
+services:
+  birt:
+    build:
+      context: ./
+      dockerfile: ./docker/dockerfiles/production/birt/Dockerfile
+    depends_on:
+    - mariadb
+    deploy:
+      labels:
+        traefik.enable: "false"
+      placement:
+        constraints:
+        - node.labels.gluster == true
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0'
+          memory: 64M
+    environment:
+      BIRT_DOCKER: '1'
+      DB_HOST: mariadb
+      DB_NAME: mmh
+      DB_USER: mmh
+      JAVA_OPTS: -Xmx1g -Xms1g
+      JVM_OPTS: -Xmx1g -Xms1g -XX:MaxPermSize=512m
+    image: registry.nixc.us/mmh-birt:staging
+    labels:
+      traefik.expose: "false"
+    networks:
+      default: {}
+    restart: always
+    secrets:
+    - source: MMH_MARIADB_PASSWORD
+    ulimits:
+      memlock:
+        hard: -1
+        soft: -1
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+  cron:
+    build:
+      context: ./
+      dockerfile: ./docker/dockerfiles/production/cron/Dockerfile
+    deploy:
+      replicas: 1
+    image: registry.nixc.us/mmh-cron:staging
+    networks:
+      default: {}
+    restart: always
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+  mariadb:
+    deploy:
+      labels:
+        traefik.enable: "false"
+      placement:
+        constraints:
+        - node.labels.db == true
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '0'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/MMH_MARIADB_ROOT_PASSWORD
+      TZ: America/New_York
+    image: registry.nixc.us/mariadb-base:production
+    networks:
+      default: {}
+      sandbox: {}
+    secrets:
+    - source: MMH_MARIADB_ROOT_PASSWORD
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /mnt/tank/persist/mmh/staging/db/mariadb:/var/lib/mysql:rw
+  nginx:
+    build:
+      context: ./
+      dockerfile: ./docker/dockerfiles/production/nginx/Dockerfile
+    depends_on:
+    - php
+    deploy:
+      labels:
+        traefik.backend: mmh-nginx-c5
+        traefik.backend.loadbalancer.stickiness: "false"
+        traefik.backend.loadbalancer.swarm: "true"
+        traefik.docker.network: traefik
+        traefik.enable: "true"
+        traefik.frontend.auth.basic.users: mmh:$$apr1$$N51ndepf$$RvM9GBxypDSLmCvfxVhtt1
+        traefik.frontend.passHostHeader: "true"
+        traefik.frontend.redirect.regex: ^https?://staging.(.*)forhealth.(.*)/(.*)
+        traefik.frontend.redirect.replacement: https://staging.$${1}forhealth.$${2}/$${3}
+        traefik.frontend.rule: Host:staging.michiganmodelforhealth.org,staging.michiganmodelforhealth.net,staging.michiganmodelforhealth.com,staging.mmforhealth.org,staging.mmforhealth.net,staging.mmforhealth.com
+        traefik.port: '80'
+        traefik.redirectorservice.frontend.entryPoints: http
+        traefik.redirectorservice.frontend.redirect.entryPoint: https
+        traefik.tags: traefik
+        traefik.webservice.frontend.entryPoints: https
+      placement:
+        constraints:
+        - node.labels.gluster == true
+        preferences:
+        - spread: node.id
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0'
+          memory: 100M
+      restart_policy:
+        condition: on-failure
+      update_config:
+        delay: 5s
+        parallelism: 1
+    environment:
+      IS_PROD: 0
+    image: registry.nixc.us/mmh-nginx:staging
+    networks:
+      default: {}
+      traefik: {}
+    user: 1000:1000
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /mnt/tank/persist/mmh/staging/data/c5-app-files:/var/www/html/application/files:rw
+  php:
+    build:
+      context: ./
+      dockerfile: ./docker/dockerfiles/production/php/Dockerfile
+    depends_on:
+    - mariadb
+    - redis
+    deploy:
+      labels:
+        traefik.enable: "false"
+      placement:
+        constraints:
+        - node.labels.gluster == true
+        preferences:
+        - spread: node.id
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0'
+          memory: 100M
+      restart_policy:
+        condition: on-failure
+      update_config:
+        delay: 10s
+        parallelism: 1
+    environment:
+      DB_HOST: mariadb
+      DB_NAME: mmh
+      DB_USER: mmh
+      IS_PROD: 1
+      USE_SMTP: 1
+    image: registry.nixc.us/mmh-php:staging
+    networks:
+      default: {}
+    secrets:
+    - source: MMH_EMAIL_PASSWORD
+    - source: MMH_MARIADB_PASSWORD
+    user: 1000:1000
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /mnt/tank/persist/mmh/staging/data/c5-files:/home/production/mmh-repo/secure_files:rw
+    - /mnt/tank/persist/mmh/staging/data/c5-app-files:/var/www/html/application/files:rw
+  redis:
+    deploy:
+      labels:
+        traefik.enable: "false"
+      placement:
+        constraints:
+        - node.labels.db == true
+        preferences:
+        - spread: node.id
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0'
+          memory: 100M
+    entrypoint: redis-server --appendonly yes
+    image: redis
+    logging:
+      driver: json-file
+      options:
+        max-file: '2'
+        max-size: 200k
+    networks:
+      default: {}
+    restart: always
+    volumes:
+    - /mnt/tank/persist/mmh/staging/db/redis:/data:rw
+    - /etc/localtime:/etc/localtime:ro
+  sshd:
+    build:
+      context: ./
+      dockerfile: ./docker/dockerfiles/production/sshd/Dockerfile
+    deploy:
+      labels:
+        traefik.enable: "false"
+      placement:
+        constraints:
+        - node.hostname == dewitt.improvingmipractices.com
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0'
+          memory: 100M
+    image: registry.nixc.us/mmh-sshd:staging
+    labels:
+      traefik.enable: "false"
+    networks:
+      sandbox: {}
+    ports:
+    - mode: host
+      published: 2223
+      target: 22
+    restart: always
+    volumes:
+    - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
+version: '3.7'
+

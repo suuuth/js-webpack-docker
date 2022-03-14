@@ -1,0 +1,6 @@
+./.git/*
+./data
+./apps/webpack/node_modules/*
+./apps/webpack/node_modules
+./data/*
+./public_html/application/config/*
