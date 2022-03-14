@@ -1,0 +1,11 @@
+
+#Ide Related Files / Folders
+.idea/
+*_notes
+*.DS_STORE
+
+#Webpack
+/apps/webpack/log.txt
+/apps/webpack/node_modules
+
+docker-compose.yml
