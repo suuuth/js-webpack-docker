@@ -1,7 +1,7 @@
 {
-  "name": "webpack-css-setup",
+  "name": "js-webpack-docker",
   "version": "1.0.0",
-  "description": "Webpack Setup",
+  "description": "JS Webpack Docker Setup",
   "main": "index.js",
   "babel": {
     "presets": [
